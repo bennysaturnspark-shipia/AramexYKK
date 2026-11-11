@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Y.K.K. Phase 3 3/F - 3D Warehouse Floorplan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: #140c0c;
+            color: #f8fafc;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* Floating 3D HTML Labels */
+        .zone-label {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .zone-label:hover {
+            transform: translate(-50%, -55%) scale(1.05);
+            z-index: 30;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(239, 51, 36, 0.6);
+            border-radius: 3px;
+        }
+        .glass-panel {
+            background: rgba(20, 12, 12, 0.88);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(239, 51, 36, 0.28);
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvas-container">
+    <!-- 3D Overlay Labels Container -->
+    <div id="labels-container" class="absolute inset-0 pointer-events-none overflow-hidden z-10"></div>
+
+    <!-- Top Header Bar -->
+    <header class="absolute top-3 left-3 right-3 md:left-6 md:right-6 flex flex-wrap items-center justify-between gap-3 glass-panel px-4 py-3 rounded-2xl z-20 shadow-2xl">
+        <div class="flex items-center gap-3">
+            <!-- Aramex Logo Badge -->
+            <div class="px-3 h-10 rounded-xl bg-[#EF3324] flex items-center justify-center text-white font-extrabold text-lg tracking-tight shadow-lg border border-white/20">
+                aramex
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-base md:text-lg tracking-tight text-white">Y.K.K. Phase 3 — 3/F Aramex Hub</h1>
+                    <span class="hidden sm:inline-block text-xs px-2 py-0.5 bg-[#EF3324]/20 text-red-300 border border-[#EF3324]/40 rounded-full font-medium">48.76m × 52.5m</span>
+                </div>
+                <p class="text-xs text-stone-400">Total Area: <span class="text-white font-medium">32,916 sq.ft</span> • Capacity: <span id="header-total-pallets" class="text-[#EF3324] font-semibold">1,320 Pallets (1 Layer)</span> • <span class="text-red-300 font-medium">5 Active Staff</span></p>
+            </div>
+        </div>
+
+        <!-- Camera Preset & Action Buttons -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+            <button onclick="toggleSidebar()" id="btn-toggle-sidebar" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#EF3324] hover:bg-red-600 text-white shadow transition flex items-center gap-1.5">
+                <span>⚙️</span> <span id="sidebar-btn-text">Open Controls</span>
+            </button>
+            <a href="https://www.google.com/maps/search/?api=1&query=Y+K+K+Building+(+Phase+I+I),+2+San+Lik+St,+Tuen+Mun,+New+Territories&query_place_id=ChIJxQtUVDr7AzQRkKBewQflZaM" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border border-white/20 shadow transition flex items-center gap-1.5" title="Y K K Building ( Phase I I), 2 San Lik St, Tuen Mun, New Territories">
+                <span>📍</span> <span>Google Maps</span>
+            </a>
+            <button onclick="setCameraPreset('iso')" id="btn-cam-iso" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#EF3324] text-white shadow transition hover:bg-red-600">
+                3D Isometric
+            </button>
+            <button onclick="setCameraPreset('top')" id="btn-cam-top" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-900 text-stone-300 hover:bg-stone-800 border border-stone-700 transition">
+                2D Blueprint View
+            </button>
+            <button onclick="setCameraPreset('working')" id="btn-cam-working" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-900 text-stone-300 hover:bg-stone-800 border border-stone-700 transition">
+                Main Corridor & Entrance
+            </button>
+        </div>
+    </header>
+
+    <!-- Left Control & Inspector Sidebar (Minimized by Default) -->
+    <aside id="sidebar" class="absolute top-20 left-3 md:left-6 bottom-16 w-80 max-w-[calc(100vw-24px)] glass-panel rounded-2xl p-4 z-20 flex flex-col justify-between overflow-y-auto shadow-2xl transition-transform duration-300 -translate-x-[120%]">
+        <div class="space-y-4">
+            <!-- Selected Zone Inspector -->
+            <div class="p-3.5 rounded-xl bg-stone-950/90 border border-red-900/50">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-[#EF3324]">Aramex Zone Inspector</span>
+                    <div class="flex items-center gap-1.5">
+                        <span id="inspector-badge" class="text-[11px] px-2 py-0.5 rounded bg-[#EF3324]/20 text-red-300 font-medium">Overview</span>
+                        <button onclick="toggleSidebar()" class="text-stone-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-stone-800 border border-stone-700" title="Minimize Menu">✕</button>
+                    </div>
+                </div>
+                <h2 id="inspector-title" class="text-base font-bold text-white mb-1">All Warehouse Zones</h2>
+                <p id="inspector-desc" class="text-xs text-stone-400 mb-3">Click any zone or structural block in the 3D viewport to inspect specs and dimensions.</p>
+                
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-stone-900/90 p-2 rounded-lg border border-stone-800">
+                        <span class="text-stone-400 block text-[10px]">Dimensions</span>
+                        <span id="inspector-dim" class="font-semibold text-stone-100">48.76m × 52.5m</span>
+                    </div>
+                    <div class="bg-stone-900/90 p-2 rounded-lg border border-stone-800">
+                        <span class="text-stone-400 block text-[10px]">Pallet Spec</span>
+                        <span id="inspector-pallet" class="font-semibold text-stone-100">120×100×180cm</span>
+                    </div>
+                    <div class="bg-stone-900/90 p-2 rounded-lg border border-stone-800">
+                        <span class="text-stone-400 block text-[10px]">Max Capacity</span>
+                        <span id="inspector-cap" class="font-semibold text-[#EF3324]">1,320 Pallets</span>
+                    </div>
+                    <div class="bg-stone-900/90 p-2 rounded-lg border border-stone-800">
+                        <span class="text-stone-400 block text-[10px]">Floor Area</span>
+                        <span id="inspector-area" class="font-semibold text-red-300">2,560 m²</span>
+                    </div>
+                </div>
+
+                <!-- Location Link inside Sidebar -->
+                <a href="https://www.google.com/maps/search/?api=1&query=Y+K+K+Building+(+Phase+I+I),+2+San+Lik+St,+Tuen+Mun,+New+Territories&query_place_id=ChIJxQtUVDr7AzQRkKBewQflZaM" target="_blank" rel="noopener noreferrer" class="mt-3 w-full flex items-center justify-between p-2 rounded-lg bg-[#EF3324]/15 hover:bg-[#EF3324]/25 border border-[#EF3324]/40 text-red-200 text-xs transition">
+                    <span class="truncate font-medium">📍 2 San Lik St, Tuen Mun, NT</span>
+                    <span class="text-[10px] underline shrink-0 ml-1">Open Map ↗</span>
+                </a>
+            </div>
+
+            <!-- Quick Zone Selector -->
+            <div>
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-stone-400 mb-2">Floorplan Zones</h3>
+                <div class="space-y-1.5">
+                    <button onclick="selectZone('Zone 1')" id="zone-btn-Zone 1" class="w-full flex items-center justify-between p-2 rounded-xl bg-stone-900/70 hover:bg-stone-800 border border-stone-800 text-left transition">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-sm bg-[#EF3324] shadow-sm"></span>
+                            <div>
+                                <div class="text-xs font-semibold text-white">Zone 1 (North)</div>
+                                <div class="text-[10px] text-stone-400">36m × 11m • 330 Pallets</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-mono text-red-400">396m²</span>
+                    </button>
+
+                    <button onclick="selectZone('Zone 2')" id="zone-btn-Zone 2" class="w-full flex items-center justify-between p-2 rounded-xl bg-stone-900/70 hover:bg-stone-800 border border-stone-800 text-left transition">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-sm bg-[#EF3324] shadow-sm"></span>
+                            <div>
+                                <div class="text-xs font-semibold text-white">Zone 2 (Upper-Mid)</div>
+                                <div class="text-[10px] text-stone-400">36m × 11m • 330 Pallets</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-mono text-red-400">396m²</span>
+                    </button>
+
+                    <button onclick="selectZone('Zone 3')" id="zone-btn-Zone 3" class="w-full flex items-center justify-between p-2 rounded-xl bg-stone-900/70 hover:bg-stone-800 border border-stone-800 text-left transition">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-sm bg-[#EF3324] shadow-sm"></span>
+                            <div>
+                                <div class="text-xs font-semibold text-white">Zone 3 (Lower-Mid)</div>
+                                <div class="text-[10px] text-stone-400">36m × 11m • 330 Pallets</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-mono text-red-400">396m²</span>
+                    </button>
+
+                    <button onclick="selectZone('Zone 4')" id="zone-btn-Zone 4" class="w-full flex items-center justify-between p-2 rounded-xl bg-stone-900/70 hover:bg-stone-800 border border-stone-800 text-left transition">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-sm bg-[#EF3324] shadow-sm"></span>
+                            <div>
+                                <div class="text-xs font-semibold text-white">Zone 4 (South)</div>
+                                <div class="text-[10px] text-stone-400">36m × 11m • 330 Pallets</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-mono text-red-400">396m²</span>
+                    </button>
+
+                    <button onclick="selectZone('Working Area')" id="zone-btn-Working Area" class="w-full flex items-center justify-between p-2 rounded-xl bg-stone-900/70 hover:bg-stone-800 border border-stone-800 text-left transition">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-sm bg-white border border-[#EF3324] shadow-sm"></span>
+                            <div>
+                                <div class="text-xs font-semibold text-white">Main Corridor & Working Area</div>
+                                <div class="text-[10px] text-stone-400">12m × 52.5m • Entrance & Lifts</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-mono text-red-300">630m²</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3D Visualization Controls -->
+            <div class="pt-2 border-t border-stone-800 space-y-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wider text-stone-400">Simulation & Layers</h3>
+
+                <!-- Utilization Slider -->
+                <div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-stone-300">Pallet Occupancy</span>
+                        <span id="utilization-label" class="font-mono text-[#EF3324] font-semibold">100% (1,320 / 1,320)</span>
+                    </div>
+                    <input id="slider-utilization" type="range" min="0" max="100" value="100" step="5" oninput="updatePalletUtilization(this.value)" class="w-full accent-[#EF3324] cursor-pointer h-1.5 bg-stone-800 rounded-lg">
+                </div>
+
+                <!-- Toggles -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <label class="flex items-center gap-2 text-xs text-stone-300 cursor-pointer bg-stone-900/60 p-2 rounded-lg border border-stone-800">
+                        <input type="checkbox" checked onchange="toggleLayer('racks', this.checked)" class="accent-[#EF3324] rounded">
+                        <span>Floor Pallets (1L)</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-xs text-stone-300 cursor-pointer bg-stone-900/60 p-2 rounded-lg border border-stone-800">
+                        <input type="checkbox" checked onchange="toggleLayer('pillars', this.checked)" class="accent-[#EF3324] rounded">
+                        <span>Columns & Logos</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-xs text-stone-300 cursor-pointer bg-stone-900/60 p-2 rounded-lg border border-stone-800">
+                        <input type="checkbox" checked onchange="toggleLayer('labels', this.checked)" class="accent-[#EF3324] rounded">
+                        <span>Zone & Staff Tags</span>
+                    </label>
+                    <label class="flex items-center gap-2 text-xs text-stone-300 cursor-pointer bg-stone-900/60 p-2 rounded-lg border border-stone-800">
+                        <input type="checkbox" checked onchange="toggleLayer('forklifts', this.checked)" class="accent-[#EF3324] rounded">
+                        <span>5 Staff & Forklifts</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend Footer inside Sidebar -->
+        <div class="mt-4 pt-3 border-t border-stone-800 text-[11px] text-stone-400 space-y-1.5">
+            <div class="flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 inline-block bg-[#EF3324]"></span> Aramex Branded Zones</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 inline-block bg-white border border-[#EF3324]"></span> 6 Cargo Lifts</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 inline-block bg-red-400 rounded-full"></span> 5 Active Workers</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 inline-block bg-stone-700"></span> Structural Columns</span>
+            </div>
+            <p class="text-[10px] text-stone-500 italic pt-1">Aramex Logistics Hub — Layout subject to actual requirement.</p>
+        </div>
+    </aside>
+
+    <!-- Bottom Navigation Hint Bar -->
+    <div class="absolute bottom-3 left-3 right-3 md:left-auto md:right-6 glass-panel px-4 py-2 rounded-xl z-20 flex items-center justify-between md:justify-end gap-4 text-xs text-stone-300 shadow-lg">
+        <span>🖱️ <b>Left Drag:</b> Orbit</span>
+        <span>🖱️ <b>Right Drag / Shift+Drag:</b> Pan</span>
+        <span>🔍 <b>Scroll:</b> Zoom</span>
+        <button onclick="resetSelection()" class="px-2.5 py-1 bg-[#EF3324] hover:bg-red-600 text-white font-medium rounded-lg shadow transition">Reset View</button>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // FLOORPLAN CONSTANTS & DATA (ARAMEX THEME)
+    // ==========================================
+    const FLOOR_WIDTH = 48.76;  // X-axis (meters)
+    const FLOOR_DEPTH = 52.50;  // Z-axis (meters)
+    const WALL_HEIGHT = 6.5;    // 3/F structural ceiling height
+    const ARAMEX_RED = 0xEF3324;
+
+    // Coordinate conversion helper:
+    // Converts PDF Top-Left origin (0..48.76, 0..52.5) to centered Three.js coordinates
+    function toWorldX(pdfX) { return pdfX - FLOOR_WIDTH / 2; }
+    function toWorldZ(pdfZ) { return pdfZ - FLOOR_DEPTH / 2; }
+
+    const ZONES_DATA = {
+        'Zone 1': {
+            id: 'Zone 1',
+            title: 'Zone 1 (Aramex Storage)',
+            dimensions: '36m × 11m',
+            width: 36,
+            depth: 11,
+            centerX: toWorldX(0.5 + 18),
+            centerZ: toWorldZ(1.2 + 5.5),
+            pallets: 330,
+            palletSpec: '120×100×180cm',
+            area: '396 m²',
+            color: 0xfecdd3,
+            badgeColor: '#EF3324',
+            description: 'Northern floor-stacked pallet storage zone adjacent to main perimeter wall & West Entrance. Houses 330 Aramex pallets (1.2m × 1.0m × 1.8m) in a single floor layer.'
+        },
+        'Zone 2': {
+            id: 'Zone 2',
+            title: 'Zone 2 (Aramex Storage)',
+            dimensions: '36m × 11m',
+            width: 36,
+            depth: 11,
+            centerX: toWorldX(0.5 + 18),
+            centerZ: toWorldZ(14.5 + 5.5),
+            pallets: 330,
+            palletSpec: '120×100×180cm',
+            area: '396 m²',
+            color: 0xfecdd3,
+            badgeColor: '#EF3324',
+            description: 'Upper-middle pallet storage zone with active order picking staff and 2.3m structural column aisles.'
+        },
+        'Zone 3': {
+            id: 'Zone 3',
+            title: 'Zone 3 (Aramex Storage)',
+            dimensions: '36m × 11m',
+            width: 36,
+            depth: 11,
+            centerX: toWorldX(0.5 + 18),
+            centerZ: toWorldZ(27.8 + 5.5),
+            pallets: 330,
+            palletSpec: '120×100×180cm',
+            area: '396 m²',
+            color: 0xfecdd3,
+            badgeColor: '#EF3324',
+            description: 'Lower-middle pallet storage zone with direct access to the main Aramex Corridor and Cargo Lift bank.'
+        },
+        'Zone 4': {
+            id: 'Zone 4',
+            title: 'Zone 4 (Aramex Storage)',
+            dimensions: '36m × 11m',
+            width: 36,
+            depth: 11,
+            centerX: toWorldX(0.5 + 18),
+            centerZ: toWorldZ(40.7 + 5.5),
+            pallets: 330,
+            palletSpec: '120×100×180cm',
+            area: '396 m²',
+            color: 0xfecdd3,
+            badgeColor: '#EF3324',
+            description: 'Southern pallet storage zone equipped with corner entrance and active barcode scanning / picking staff.'
+        },
+        'Working Area': {
+            id: 'Working Area',
+            title: 'Main Corridor & Working Area',
+            dimensions: '12m × 52.5m',
+            width: 10.2,
+            depth: 50.0,
+            centerX: toWorldX(36.8 + 5.1),
+            centerX_real: toWorldX(36.8 + 5.1),
+            centerZ: toWorldZ(26.25),
+            pallets: 0,
+            palletSpec: 'Picking, Packing & Dispatch',
+            area: '630 m² (12m × 52.5m)',
+            color: 0xffe4e6,
+            badgeColor: '#b91c1c',
+            description: 'Main 12m × 52.5m Aramex branded corridor featuring Entrance Archway, floor logos, packing stations, and 6 heavy-duty Cargo Lifts.'
+        }
+    };
+
+    // ==========================================
+    // THREE.JS SCENE GLOBALS
+    // ==========================================
+    let scene, camera, renderer, raycaster, mouse;
+    let racksGroup, pillarsGroup, forkliftsGroup, workersGroup;
+    let aramexLogoTexture;
+    let palletMeshes = [];
+    let zoneFloorMeshes = {};
+    let htmlLabels = [];
+    let selectedZoneId = null;
+    let showLabels = true;
+    let animateForklifts = true;
+    let forklifts = [];
+    let animatedWorkers = [];
+
+    // Custom Orbit / Pan Camera State
+    let camState = {
+        theta: -0.45,       // Horizontal angle
+        phi: 0.92,          // Vertical angle from top
+        radius: 68,         // Distance from target
+        target: new THREE.Vector3(0, 0, 0),
+        targetGoal: new THREE.Vector3(0, 0, 0),
+        thetaGoal: -0.45,
+        phiGoal: 0.92,
+        radiusGoal: 68,
+        isDragging: false,
+        isPanning: false,
+        prevMouse: { x: 0, y: 0 }
+    };
+
+    // Dynamically generates the exact uploaded Aramex Logo texture (Red #EF3324 background + bold lowercase white 'aramex' typography)
+    function createAramexLogoTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        // Official Aramex Red Fill
+        ctx.fillStyle = '#EF3324';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Subtle crisp white inner border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
+
+        // Bold white lowercase 'aramex' wordmark
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '800 215px "Inter", "Helvetica Neue", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('aramex', canvas.width / 2, canvas.height / 2 + 8);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.anisotropy = 4;
+        return texture;
+    }
+
+    function init3D() {
+        const container = document.getElementById('canvas-container');
+
+        // Scene with deep warm charcoal-red ambient tone matching the logo
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x140c0c);
+        scene.fog = new THREE.FogExp2(0x140c0c, 0.0042);
+
+        // Camera
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 400);
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Raycaster for clicking zones
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+
+        // Create Aramex Logo Texture
+        aramexLogoTexture = createAramexLogoTexture();
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xfff5f5, 0.68);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.88);
+        dirLight.position.set(35, 65, 40);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 160;
+        const d = 40;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.DirectionalLight(ARAMEX_RED, 0.22);
+        fillLight.position.set(-40, 30, -30);
+        scene.add(fillLight);
+
+        // Groups
+        racksGroup = new THREE.Group();
+        pillarsGroup = new THREE.Group();
+        forkliftsGroup = new THREE.Group();
+        workersGroup = new THREE.Group();
+        scene.add(racksGroup);
+        scene.add(pillarsGroup);
+        scene.add(forkliftsGroup);
+        scene.add(workersGroup);
+
+        // Build Warehouse Elements matching PDF + Aramex Branding + 5 Workers
+        buildBaseSlabAndDimensions();
+        buildZonesAndWorkingArea();
+        buildAramexBrandingAndEntrances();
+        buildStructuralPillarsAndHydrants();
+        buildRightSideCoreAndCargoLifts();
+        buildPalletRacks();
+        buildAnimatedForklifts();
+        buildFiveWarehouseWorkers();
+        createFloatingLabels();
+
+        // Setup Controls & Events
+        setupInteractionEvents();
+        window.addEventListener('resize', onWindowResize);
+
+        // Start Loop
+        animate();
+    }
+
+    // ==========================================
+    // 1. BASE SLAB & ARAMEX DIMENSION RULERS
+    // ==========================================
+    function buildBaseSlabAndDimensions() {
+        // Outer dark grid with subtle crimson tint
+        const gridHelper = new THREE.GridHelper(130, 65, 0x3b1919, 0x261212);
+        gridHelper.position.y = -0.25;
+        scene.add(gridHelper);
+
+        // Main Clean White Warehouse Concrete Slab (48.76m x 52.5m)
+        const slabGeo = new THREE.BoxGeometry(FLOOR_WIDTH, 0.4, FLOOR_DEPTH);
+        const slabMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.7,
+            metalness: 0.05
+        });
+        const slab = new THREE.Mesh(slabGeo, slabMat);
+        slab.position.y = -0.2;
+        slab.receiveShadow = true;
+        scene.add(slab);
+
+        // Aramex Red Perimeter Outline Border
+        const borderEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(FLOOR_WIDTH + 0.1, 0.42, FLOOR_DEPTH + 0.1));
+        const borderLine = new THREE.LineSegments(borderEdges, new THREE.LineBasicMaterial({ color: ARAMEX_RED, linewidth: 2 }));
+        borderLine.position.y = -0.2;
+        scene.add(borderLine);
+
+        // Top & Right Dimension Bars in Aramex Red
+        const topBarGeo = new THREE.PlaneGeometry(FLOOR_WIDTH, 1.3);
+        const redBarMat = new THREE.MeshBasicMaterial({ color: ARAMEX_RED, side: THREE.DoubleSide });
+        const topBar = new THREE.Mesh(topBarGeo, redBarMat);
+        topBar.rotation.x = -Math.PI / 2;
+        topBar.position.set(0, 0.02, -FLOOR_DEPTH / 2 - 1.1);
+        scene.add(topBar);
+
+        const rightBarGeo = new THREE.PlaneGeometry(1.3, FLOOR_DEPTH);
+        const rightBar = new THREE.Mesh(rightBarGeo, redBarMat);
+        rightBar.rotation.x = -Math.PI / 2;
+        rightBar.position.set(FLOOR_WIDTH / 2 + 1.1, 0.02, 0);
+        scene.add(rightBar);
+    }
+
+    // ==========================================
+    // 2. ZONES 1-4 & WORKING AREA FLOOR PADS
+    // ==========================================
+    function buildZonesAndWorkingArea() {
+        Object.values(ZONES_DATA).forEach(zone => {
+            const geo = new THREE.BoxGeometry(zone.width, 0.08, zone.depth);
+            const mat = new THREE.MeshStandardMaterial({
+                color: zone.color,
+                roughness: 0.5,
+                metalness: 0.05
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(zone.centerX, 0.04, zone.centerZ);
+            mesh.receiveShadow = true;
+            mesh.userData = { zoneId: zone.id };
+            scene.add(mesh);
+            zoneFloorMeshes[zone.id] = mesh;
+
+            // Crisp red border outline around each zone
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: ARAMEX_RED }));
+            mesh.add(line);
+        });
+
+        // Double vertical aisle lines running down the right side of the Working Area
+        const lineMat = new THREE.MeshBasicMaterial({ color: ARAMEX_RED });
+        [-1.2, -0.9].forEach(offset => {
+            const stripeGeo = new THREE.PlaneGeometry(0.08, 50.0);
+            const stripe = new THREE.Mesh(stripeGeo, lineMat);
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.position.set(toWorldX(45.2 + offset), 0.09, toWorldZ(26.25));
+            scene.add(stripe);
+        });
+
+        // Red Swing Arc Graphic at the Main Entrance in the Working Area
+        const arcCurve = new THREE.EllipseCurve(
+            toWorldX(46.8), toWorldZ(26.25),
+            3.2, 3.2,
+            Math.PI * 0.5, Math.PI * 1.5,
+            false, 0
+        );
+        const arcPoints = arcCurve.getPoints(32).map(p => new THREE.Vector3(p.x, 0.1, p.y));
+        const arcGeo = new THREE.BufferGeometry().setFromPoints(arcPoints);
+        const arcLine = new THREE.Line(arcGeo, new THREE.LineBasicMaterial({ color: ARAMEX_RED }));
+        scene.add(arcLine);
+
+        // Top-Left & Bottom-Left Corner Entrance Vestibule Squares
+        const cornerPositions = [
+            { x: toWorldX(1.3), z: toWorldZ(2.2) },
+            { x: toWorldX(1.3), z: toWorldZ(50.3) }
+        ];
+        cornerPositions.forEach(pos => {
+            const boxGeo = new THREE.BoxGeometry(1.6, 0.12, 2.0);
+            const edges = new THREE.EdgesGeometry(boxGeo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: ARAMEX_RED }));
+            line.position.set(pos.x, 0.1, pos.z);
+            scene.add(line);
+        });
+    }
+
+    // ==========================================
+    // 2B. ARAMEX LOGOS AT ENTRANCE & MAIN CORRIDOR
+    // ==========================================
+    function buildAramexBrandingAndEntrances() {
+        const logoMat = new THREE.MeshBasicMaterial({
+            map: aramexLogoTexture,
+            side: THREE.DoubleSide
+        });
+        const redMetalMat = new THREE.MeshStandardMaterial({
+            color: ARAMEX_RED,
+            roughness: 0.3,
+            metalness: 0.2
+        });
+
+        // 1. MAIN CORRIDOR FLOOR LOGOS (Large Aramex decals along the 12m x 52.5m Main Working Corridor)
+        const corridorX = toWorldX(41.2);
+        const corridorFloorZ = [12.0, 26.25, 40.5];
+        corridorFloorZ.forEach((zPos, i) => {
+            const decalW = i === 1 ? 8.2 : 6.4;
+            const decalH = i === 1 ? 4.1 : 3.2;
+            const floorLogoGeo = new THREE.PlaneGeometry(decalW, decalH);
+            const floorLogo = new THREE.Mesh(floorLogoGeo, logoMat);
+            floorLogo.rotation.x = -Math.PI / 2;
+            // Rotate so 'aramex' reads cleanly along the main corridor
+            floorLogo.rotation.z = -Math.PI / 2;
+            floorLogo.position.set(corridorX, 0.095, toWorldZ(zPos));
+            pillarsGroup.add(floorLogo);
+        });
+
+        // Horizontal Cross-Aisle Floor Logos at corridor intersections
+        [13.35, 26.65, 39.55].forEach(aisleZ => {
+            const aisleLogo = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 2.2), logoMat);
+            aisleLogo.rotation.x = -Math.PI / 2;
+            aisleLogo.position.set(toWorldX(34.0), 0.09, toWorldZ(aisleZ));
+            pillarsGroup.add(aisleLogo);
+        });
+
+        // 2. MAIN ENTRANCE PORTAL & SIGNAGE (East Main Corridor Entrance at Z = 26.25m where the red door swing arc is located)
+        const mainEntranceGroup = new THREE.Group();
+        mainEntranceGroup.position.set(toWorldX(46.2), 0, toWorldZ(26.25));
+
+        // Red Entrance Portal Columns
+        const postGeo = new THREE.BoxGeometry(0.45, 5.2, 0.45);
+        const leftPost = new THREE.Mesh(postGeo, redMetalMat);
+        leftPost.position.set(0, 2.6, -3.4);
+        const rightPost = new THREE.Mesh(postGeo, redMetalMat);
+        rightPost.position.set(0, 2.6, 3.4);
+        mainEntranceGroup.add(leftPost, rightPost);
+
+        // Overhead Entrance Header Beam with Aramex Logo Signboard
+        const headerBeam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 7.3), redMetalMat);
+        headerBeam.position.set(0, 4.9, 0);
+        mainEntranceGroup.add(headerBeam);
+
+        const mainSignBoard = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.5, 5.4), redMetalMat);
+        mainSignBoard.position.set(-0.2, 4.8, 0);
+        mainEntranceGroup.add(mainSignBoard);
+
+        // Front & Back Logo Faces on Main Entrance Signboard
+        const signPlaneFront = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.4), logoMat);
+        signPlaneFront.rotation.y = -Math.PI / 2;
+        signPlaneFront.position.set(-0.34, 4.8, 0);
+        mainEntranceGroup.add(signPlaneFront);
+
+        const signPlaneBack = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 2.4), logoMat);
+        signPlaneBack.rotation.y = Math.PI / 2;
+        signPlaneBack.position.set(-0.06, 4.8, 0);
+        mainEntranceGroup.add(signPlaneBack);
+
+        // Entrance Welcome Mat with Aramex Logo
+        const welcomeMat = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 4.4), logoMat);
+        welcomeMat.rotation.x = -Math.PI / 2;
+        welcomeMat.rotation.z = -Math.PI / 2;
+        welcomeMat.position.set(-1.3, 0.098, 0);
+        mainEntranceGroup.add(welcomeMat);
+
+        pillarsGroup.add(mainEntranceGroup);
+
+        // 3. NORTH CORRIDOR ENTRANCE ARCHWAY (Top of the 12m Main Corridor)
+        const northGateGroup = new THREE.Group();
+        northGateGroup.position.set(corridorX, 0, toWorldZ(1.0));
+
+        const nLeftPost = new THREE.Mesh(postGeo, redMetalMat);
+        nLeftPost.position.set(-4.2, 2.6, 0);
+        const nRightPost = new THREE.Mesh(postGeo, redMetalMat);
+        nRightPost.position.set(4.2, 2.6, 0);
+        const nBeam = new THREE.Mesh(new THREE.BoxGeometry(8.9, 0.5, 0.5), redMetalMat);
+        nBeam.position.set(0, 5.0, 0);
+        northGateGroup.add(nLeftPost, nRightPost, nBeam);
+
+        const nSignBox = new THREE.Mesh(new THREE.BoxGeometry(6.0, 2.6, 0.28), redMetalMat);
+        nSignBox.position.set(0, 5.0, 0);
+        northGateGroup.add(nSignBox);
+
+        const nSignFront = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 2.4), logoMat);
+        nSignFront.position.set(0, 5.0, 0.16);
+        const nSignBack = new THREE.Mesh(new THREE.PlaneGeometry(5.8, 2.4), logoMat);
+        nSignBack.rotation.y = Math.PI;
+        nSignBack.position.set(0, 5.0, -0.16);
+        northGateGroup.add(nSignFront, nSignBack);
+
+        pillarsGroup.add(northGateGroup);
+
+        // 4. WEST CORNER VESTIBULE ENTRANCES (Zone 1 & Zone 4 Left Doors shown in PDF)
+        [2.2, 50.3].forEach(zPos => {
+            const westSign = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.5), logoMat);
+            westSign.rotation.y = Math.PI / 2;
+            westSign.position.set(toWorldX(0.55), 3.4, toWorldZ(zPos));
+            pillarsGroup.add(westSign);
+        });
+    }
+
+    // ==========================================
+    // 3. STRUCTURAL PILLARS & ARAMEX STRIPES
+    // ==========================================
+    function buildStructuralPillarsAndHydrants() {
+        const pillarMat = new THREE.MeshStandardMaterial({
+            color: 0x1c1917,
+            roughness: 0.4,
+            metalness: 0.3
+        });
+        const stripeMat = new THREE.MeshBasicMaterial({ color: ARAMEX_RED });
+
+        // 5 Rows of structural columns (Top wall, Aisle 1-2, Aisle 2-3, Aisle 3-4, Bottom wall)
+        const colXPositions = [1.2, 12.2, 24.4, 35.5];
+        const rowZPositions = [
+            { z: 0.45, depth: 0.9 },   // Top Wall Row
+            { z: 13.35, depth: 1.5 },  // Between Zone 1 & 2
+            { z: 26.65, depth: 1.5 },  // Between Zone 2 & 3
+            { z: 39.55, depth: 1.5 },  // Between Zone 3 & 4
+            { z: 52.05, depth: 0.9 }   // Bottom Wall Row
+        ];
+
+        rowZPositions.forEach(row => {
+            colXPositions.forEach((colX, idx) => {
+                const width = idx === 0 ? 1.6 : 2.1;
+                const colGeo = new THREE.BoxGeometry(width, WALL_HEIGHT, row.depth);
+                const colMesh = new THREE.Mesh(colGeo, pillarMat);
+                colMesh.position.set(toWorldX(colX), WALL_HEIGHT / 2, toWorldZ(row.z));
+                colMesh.castShadow = true;
+                colMesh.receiveShadow = true;
+                pillarsGroup.add(colMesh);
+
+                // Aramex Red wrap-around band on each structural column
+                const bandGeo = new THREE.BoxGeometry(width + 0.06, 0.55, row.depth + 0.06);
+                const band = new THREE.Mesh(bandGeo, stripeMat);
+                band.position.y = 0.6;
+                colMesh.add(band);
+
+                // Top cap highlight
+                const capGeo = new THREE.BoxGeometry(width + 0.05, 0.1, row.depth + 0.05);
+                const capMat = new THREE.MeshBasicMaterial({ color: ARAMEX_RED });
+                const cap = new THREE.Mesh(capGeo, capMat);
+                cap.position.y = WALL_HEIGHT / 2;
+                colMesh.add(cap);
+            });
+        });
+
+        // Red Fire Hose Reels / Hydrants next to the left-most columns
+        const hydrantMat = new THREE.MeshStandardMaterial({ color: ARAMEX_RED, roughness: 0.3 });
+        const hydrantZ = [12.3, 40.5];
+        hydrantZ.forEach(zPos => {
+            const hGeo = new THREE.BoxGeometry(0.8, 1.6, 0.45);
+            const hMesh = new THREE.Mesh(hGeo, hydrantMat);
+            hMesh.position.set(toWorldX(1.3), 0.8, toWorldZ(zPos));
+            hMesh.castShadow = true;
+            pillarsGroup.add(hMesh);
+        });
+    }
+
+    // ==========================================
+    // 4. RIGHT-SIDE CORE: 6 CARGO LIFTS & 5 SHAFTS
+    // ==========================================
+    function buildRightSideCoreAndCargoLifts() {
+        const coreX = toWorldX(47.3); // Right-most 2.9m service bay strip
+
+        // Translucent perimeter glass/concrete wall
+        const wallMat = new THREE.MeshStandardMaterial({
+            color: 0xfecdd3,
+            transparent: true,
+            opacity: 0.22,
+            roughness: 0.2
+        });
+        const backWall = new THREE.Mesh(new THREE.BoxGeometry(0.25, WALL_HEIGHT, FLOOR_DEPTH), wallMat);
+        backWall.position.set(FLOOR_WIDTH / 2, WALL_HEIGHT / 2, 0);
+        pillarsGroup.add(backWall);
+
+        // 5 Crossed Service Void Shafts (Top 3 + Middle 2 with [X] markings in PDF)
+        const shaftZPositions = [4.2, 6.8, 9.4, 18.2, 20.8];
+        shaftZPositions.forEach(zPos => {
+            const shaftGroup = new THREE.Group();
+            shaftGroup.position.set(coreX, 0, toWorldZ(zPos));
+
+            // Shaft Frame
+            const frameGeo = new THREE.BoxGeometry(2.3, WALL_HEIGHT * 0.75, 2.3);
+            const frameMat = new THREE.MeshStandardMaterial({
+                color: 0x44403c,
+                transparent: true,
+                opacity: 0.35
+            });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.position.y = (WALL_HEIGHT * 0.75) / 2;
+            shaftGroup.add(frame);
+
+            const edges = new THREE.EdgesGeometry(frameGeo);
+            shaftGroup.add(new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x292524 })));
+
+            // Diagonal 'X' lines on floor of shaft
+            const xPoints = [
+                new THREE.Vector3(-1.1, 0.15, -1.1), new THREE.Vector3(1.1, 0.15, 1.1),
+                new THREE.Vector3(1.1, 0.15, -1.1), new THREE.Vector3(-1.1, 0.15, 1.1)
+            ];
+            const xGeo = new THREE.BufferGeometry().setFromPoints(xPoints);
+            const xLines = new THREE.LineSegments(xGeo, new THREE.LineBasicMaterial({ color: ARAMEX_RED }));
+            shaftGroup.add(xLines);
+
+            pillarsGroup.add(shaftGroup);
+        });
+
+        // 6 Cargo Lifts (Styled in crisp White & Aramex Red)
+        const liftZPositions = [31.2, 34.0, 36.8, 42.8, 45.6, 48.4];
+        liftZPositions.forEach((zPos, idx) => {
+            const liftGroup = new THREE.Group();
+            liftGroup.position.set(coreX, 0, toWorldZ(zPos));
+
+            // Lift Shaft Structure
+            const shaftGeo = new THREE.BoxGeometry(2.4, WALL_HEIGHT * 0.85, 2.5);
+            const shaftMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.28,
+                roughness: 0.3
+            });
+            const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+            shaft.position.y = (WALL_HEIGHT * 0.85) / 2;
+            liftGroup.add(shaft);
+
+            const shaftEdges = new THREE.EdgesGeometry(shaftGeo);
+            liftGroup.add(new THREE.LineSegments(shaftEdges, new THREE.LineBasicMaterial({ color: ARAMEX_RED })));
+
+            // Elevator Car Platform inside shaft
+            const carGeo = new THREE.BoxGeometry(2.1, 0.25, 2.2);
+            const carMat = new THREE.MeshStandardMaterial({ color: ARAMEX_RED, metalness: 0.3, roughness: 0.4 });
+            const car = new THREE.Mesh(carGeo, carMat);
+            car.position.y = 0.2 + (idx % 2) * 1.4;
+            liftGroup.add(car);
+
+            // Safety gate facing Working Area
+            const gateGeo = new THREE.BoxGeometry(0.08, 2.2, 2.1);
+            const gateMat = new THREE.MeshStandardMaterial({ color: ARAMEX_RED, wireframe: true });
+            const gate = new THREE.Mesh(gateGeo, gateMat);
+            gate.position.set(-1.2, 1.1, 0);
+            liftGroup.add(gate);
+
+            pillarsGroup.add(liftGroup);
+        });
+
+        // Core Structural Black Blocks along the right wall
+        const rightCorePillarsZ = [0.6, 12.6, 23.2, 29.0, 39.2, 51.8];
+        const blackMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.5 });
+        rightCorePillarsZ.forEach(zPos => {
+            const blk = new THREE.Mesh(new THREE.BoxGeometry(2.3, WALL_HEIGHT, 1.3), blackMat);
+            blk.position.set(coreX, WALL_HEIGHT / 2, toWorldZ(zPos));
+            blk.castShadow = true;
+            pillarsGroup.add(blk);
+        });
+    }
+
+    // ==========================================
+    // 5. FLOOR-STACKED PALLETS (1 LAYER, ARAMEX COLOR PALETTE)
+    // ==========================================
+    function buildPalletRacks() {
+        const woodPalletMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.8 });
+        // Branded Aramex parcel palette: Crisp White, Aramex Red, Soft Grey, Warm Kraft
+        const cartonColors = [0xffffff, 0xEF3324, 0xf3f4f6, 0xfecdd3];
+        const cartonMaterials = cartonColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55 }));
+
+        const storageZones = ['Zone 1', 'Zone 2', 'Zone 3', 'Zone 4'];
+
+        storageZones.forEach(zoneKey => {
+            const zone = ZONES_DATA[zoneKey];
+            const zoneRackGroup = new THREE.Group();
+            zoneRackGroup.position.set(zone.centerX, 0, zone.centerZ);
+
+            const cols = 30;
+            const rows = 11;
+            const stepX = 1.18;
+            const stepZ = 0.98;
+            const startX = -((cols - 1) * stepX) / 2;
+            const startZ = -((rows - 1) * stepZ) / 2;
+
+            let zonePalletCount = 0;
+
+            for (let r = 0; r < rows; r++) {
+                const rz = startZ + r * stepZ;
+                for (let c = 0; c < cols; c++) {
+                    if (zonePalletCount >= 330) break;
+
+                    const bx = startX + c * stepX;
+                    const palletContainer = new THREE.Group();
+                    palletContainer.position.set(bx, 0.08, rz);
+
+                    // Pallet Base
+                    const baseGeo = new THREE.BoxGeometry(1.10, 0.14, 0.92);
+                    const baseMesh = new THREE.Mesh(baseGeo, woodPalletMat);
+                    baseMesh.position.y = 0.07;
+                    palletContainer.add(baseMesh);
+
+                    // Single-Layer Cargo Load
+                    const cargoGeo = new THREE.BoxGeometry(1.06, 1.66, 0.88);
+                    const cargoMat = cartonMaterials[(c * 3 + r + zonePalletCount) % cartonMaterials.length];
+                    const cargoMesh = new THREE.Mesh(cargoGeo, cargoMat);
+                    cargoMesh.position.y = 0.14 + 0.83;
+                    cargoMesh.castShadow = true;
+                    cargoMesh.receiveShadow = true;
+                    palletContainer.add(cargoMesh);
+
+                    zoneRackGroup.add(palletContainer);
+                    palletMeshes.push(palletContainer);
+                    zonePalletCount++;
+                }
+            }
+
+            racksGroup.add(zoneRackGroup);
+        });
+    }
+
+    // ==========================================
+    // 6. ANIMATED FORKLIFTS IN WORKING AREA (ARAMEX RED & WHITE)
+    // ==========================================
+    function buildAnimatedForklifts() {
+        const workingXPaths = [toWorldX(39.0), toWorldX(43.2)];
+
+        workingXPaths.forEach((xPos, idx) => {
+            const flGroup = new THREE.Group();
+
+            // Forklift Body in Aramex Red
+            const bodyGeo = new THREE.BoxGeometry(1.3, 1.4, 2.0);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: ARAMEX_RED, roughness: 0.3, metalness: 0.2 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.8;
+            body.castShadow = true;
+            flGroup.add(body);
+
+            // Cab Cage
+            const cabGeo = new THREE.BoxGeometry(1.1, 1.0, 1.2);
+            const cabMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, wireframe: true });
+            const cab = new THREE.Mesh(cabGeo, cabMat);
+            cab.position.set(0, 1.9, -0.2);
+            flGroup.add(cab);
+
+            // Mast & Forks
+            const mastGeo = new THREE.BoxGeometry(0.9, 2.4, 0.12);
+            const mastMat = new THREE.MeshStandardMaterial({ color: 0x1c1917 });
+            const mast = new THREE.Mesh(mastGeo, mastMat);
+            mast.position.set(0, 1.3, 1.05);
+            flGroup.add(mast);
+
+            // Carried Aramex Parcel
+            const carriedPallet = new THREE.Mesh(
+                new THREE.BoxGeometry(1.1, 0.9, 1.0),
+                new THREE.MeshStandardMaterial({ color: 0xffffff })
+            );
+            carriedPallet.position.set(0, 0.65, 1.65);
+            flGroup.add(carriedPallet);
+
+            flGroup.position.set(xPos, 0, idx === 0 ? -18 : 18);
+            forkliftsGroup.add(flGroup);
+
+            forklifts.push({
+                mesh: flGroup,
+                speed: idx === 0 ? 0.085 : -0.075,
+                minZ: -21,
+                maxZ: 21
+            });
+        });
+    }
+
+    // ==========================================
+    // 6B. 5 ARAMEX WAREHOUSE WORKERS (PICKING, PACKING, MOVING)
+    // ==========================================
+    function createHumanWorkerMesh(roleType) {
+        const worker = new THREE.Group();
+
+        const redUniformMat = new THREE.MeshStandardMaterial({ color: ARAMEX_RED, roughness: 0.45 });
+        const whiteTrimMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+        const darkPantsMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.6 });
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.5 });
+
+        // Legs (with pivot at hip for walking animation)
+        const legGeo = new THREE.BoxGeometry(0.18, 0.72, 0.18);
+        const leftLeg = new THREE.Mesh(legGeo, darkPantsMat);
+        leftLeg.position.set(-0.14, 0.36, 0);
+        const rightLeg = new THREE.Mesh(legGeo, darkPantsMat);
+        rightLeg.position.set(0.14, 0.36, 0);
+        worker.add(leftLeg, rightLeg);
+
+        // Torso (Aramex Red Polo / Safety Vest with White Stripe)
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.68, 0.30), redUniformMat);
+        torso.position.y = 1.06;
+        torso.castShadow = true;
+        worker.add(torso);
+
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.12, 0.32), whiteTrimMat);
+        stripe.position.y = 1.02;
+        worker.add(stripe);
+
+        // Head & White/Red Safety Helmet
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 14), skinMat);
+        head.position.y = 1.62;
+        worker.add(head);
+
+        const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.15, 14), whiteTrimMat);
+        helmet.position.y = 1.74;
+        worker.add(helmet);
+
+        // Arms
+        const armGeo = new THREE.BoxGeometry(0.15, 0.58, 0.15);
+        const leftArm = new THREE.Mesh(armGeo, redUniformMat);
+        leftArm.position.set(-0.36, 1.05, 0.1);
+        const rightArm = new THREE.Mesh(armGeo, redUniformMat);
+        rightArm.position.set(0.36, 1.05, 0.1);
+        worker.add(leftArm, rightArm);
+
+        // Role-specific equipment (Carton box, pallet jack, or scanner)
+        let propMesh = null;
+        if (roleType === 'moving-box' || roleType === 'picking' || roleType === 'packing') {
+            leftArm.rotation.x = -Math.PI / 3;
+            rightArm.rotation.x = -Math.PI / 3;
+
+            const boxGroup = new THREE.Group();
+            const parcel = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.40, 0.44), whiteTrimMat);
+            const redTape = new THREE.Mesh(new THREE.BoxGeometry(0.53, 0.10, 0.45), redUniformMat);
+            boxGroup.add(parcel, redTape);
+            boxGroup.position.set(0, 1.08, 0.42);
+            worker.add(boxGroup);
+            propMesh = boxGroup;
+        } else if (roleType === 'moving-jack') {
+            leftArm.rotation.x = -Math.PI / 4;
+            rightArm.rotation.x = -Math.PI / 4;
+
+            // Manual Pallet Jack + Loaded Aramex Pallet
+            const jackGroup = new THREE.Group();
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.1), darkPantsMat);
+            handle.position.set(0, 0.65, 0.55);
+            handle.rotation.x = 0.35;
+            jackGroup.add(handle);
+
+            const palletLoad = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.95, 1.1), redUniformMat);
+            palletLoad.position.set(0, 0.55, 1.35);
+            palletLoad.castShadow = true;
+            jackGroup.add(palletLoad);
+
+            const logoTop = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.42), new THREE.MeshBasicMaterial({ map: aramexLogoTexture }));
+            logoTop.rotation.x = -Math.PI / 2;
+            logoTop.position.set(0, 1.03, 1.35);
+            jackGroup.add(logoTop);
+
+            worker.add(jackGroup);
+            propMesh = jackGroup;
+        }
+
+        worker.userData = { leftLeg, rightLeg, leftArm, rightArm, propMesh };
+        return worker;
+    }
+
+    function buildFiveWarehouseWorkers() {
+        const tableMat = new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.5 });
+        const redTopMat = new THREE.MeshStandardMaterial({ color: ARAMEX_RED, roughness: 0.4 });
+
+        // Packing Station Tables in the Main Corridor (for Workers #2 and #4)
+        const packStationsZ = [toWorldZ(19.5), toWorldZ(35.0)];
+        packStationsZ.forEach(zPos => {
+            const tableGroup = new THREE.Group();
+            tableGroup.position.set(toWorldX(37.9), 0, zPos);
+
+            const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 2.6), redTopMat);
+            top.position.y = 0.92;
+            top.castShadow = true;
+            tableGroup.add(top);
+
+            const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 2.4), tableMat);
+            base.position.y = 0.45;
+            tableGroup.add(base);
+
+            // Stacked parcels on packing table
+            const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.45, 0.55), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+            p1.position.set(0, 1.2, -0.6);
+            const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.38, 0.5), redTopMat);
+            p2.position.set(0.1, 1.16, 0.65);
+            tableGroup.add(p1, p2);
+
+            workersGroup.add(tableGroup);
+        });
+
+        // Define the 5 Workers (Picking, Packing, Moving)
+        const workerConfigs = [
+            {
+                id: 'Worker 1',
+                label: '👷 Worker 1: Picking',
+                role: 'picking',
+                startPos: new THREE.Vector3(toWorldX(21.5), 0, toWorldZ(13.35)),
+                endPos: new THREE.Vector3(toWorldX(33.5), 0, toWorldZ(13.35)),
+                speed: 0.045
+            },
+            {
+                id: 'Worker 2',
+                label: '📦 Worker 2: Packing',
+                role: 'packing',
+                startPos: new THREE.Vector3(toWorldX(36.9), 0, toWorldZ(19.5)),
+                endPos: new THREE.Vector3(toWorldX(36.9), 0, toWorldZ(19.5)),
+                speed: 0
+            },
+            {
+                id: 'Worker 3',
+                label: '🚶 Worker 3: Moving Pallet',
+                role: 'moving-jack',
+                startPos: new THREE.Vector3(toWorldX(41.2), 0, toWorldZ(9.0)),
+                endPos: new THREE.Vector3(toWorldX(41.2), 0, toWorldZ(43.5)),
+                speed: 0.065
+            },
+            {
+                id: 'Worker 4',
+                label: '📦 Worker 4: Packing',
+                role: 'packing',
+                startPos: new THREE.Vector3(toWorldX(36.9), 0, toWorldZ(35.0)),
+                endPos: new THREE.Vector3(toWorldX(36.9), 0, toWorldZ(35.0)),
+                speed: 0
+            },
+            {
+                id: 'Worker 5',
+                label: '👷 Worker 5: Picking & Moving',
+                role: 'moving-box',
+                startPos: new THREE.Vector3(toWorldX(15.0), 0, toWorldZ(39.55)),
+                endPos: new THREE.Vector3(toWorldX(36.5), 0, toWorldZ(39.55)),
+                speed: 0.055
+            }
+        ];
+
+        workerConfigs.forEach((cfg, idx) => {
+            const mesh = createHumanWorkerMesh(cfg.role);
+            mesh.position.copy(cfg.startPos);
+            if (cfg.role === 'packing') {
+                mesh.rotation.y = Math.PI / 2; // Face the packing table in the corridor
+            }
+            workersGroup.add(mesh);
+
+            animatedWorkers.push({
+                ...cfg,
+                mesh,
+                progress: idx * 0.2,
+                direction: 1,
+                phaseOffset: idx * 1.4
+            });
+        });
+    }
+
+    // ==========================================
+    // 7. FLOATING HTML BADGES (ARAMEX RED & WHITE)
+    // ==========================================
+    function createFloatingLabels() {
+        const container = document.getElementById('labels-container');
+        container.innerHTML = '';
+        htmlLabels = [];
+
+        // 4 Storage Zone Callout Boxes + 1 Main Corridor Working Area Box
+        Object.values(ZONES_DATA).forEach(zone => {
+            const el = document.createElement('div');
+            el.className = 'zone-label pointer-events-auto rounded-lg shadow-xl border border-white/40 px-3 py-1.5 text-center transition-all select-none';
+            
+            if (zone.id === 'Working Area') {
+                el.style.backgroundColor = 'rgba(185, 28, 28, 0.94)';
+                el.innerHTML = `
+                    <div class="font-extrabold text-xs text-white tracking-wide uppercase">aramex Main Corridor</div>
+                    <div class="text-[11px] text-red-100 font-semibold">${zone.dimensions} • Working Area</div>
+                `;
+            } else {
+                el.style.backgroundColor = 'rgba(239, 51, 36, 0.92)';
+                el.innerHTML = `
+                    <div class="font-bold text-xs text-white">${zone.id}</div>
+                    <div class="text-[11px] font-bold text-red-100">${zone.dimensions}</div>
+                    <div class="text-[10px] font-semibold text-white">${zone.pallets} pallets (120x100x180cm)</div>
+                `;
+            }
+
+            el.onclick = (e) => {
+                e.stopPropagation();
+                selectZone(zone.id);
+            };
+
+            container.appendChild(el);
+            htmlLabels.push({
+                element: el,
+                worldPos: new THREE.Vector3(zone.centerX, 3.8, zone.centerZ),
+                zoneId: zone.id
+            });
+        });
+
+        // Dimension, Entrance & Lift Labels
+        const extraBadges = [
+            {
+                text: '48.76 meter',
+                pos: new THREE.Vector3(0, 0.5, -FLOOR_DEPTH / 2 - 1.3),
+                cls: 'bg-[#EF3324] text-white font-bold text-[11px] px-2 py-0.5 rounded shadow border border-white/40'
+            },
+            {
+                text: '52.5 meter',
+                pos: new THREE.Vector3(FLOOR_WIDTH / 2 + 1.5, 0.5, 0),
+                cls: 'bg-[#EF3324] text-white font-bold text-[11px] px-2 py-0.5 rounded shadow border border-white/40'
+            },
+            {
+                text: '🚪 Main Entrance (aramex)',
+                pos: new THREE.Vector3(toWorldX(46.2), 5.8, toWorldZ(26.25)),
+                cls: 'bg-white text-[#EF3324] font-extrabold text-[11px] px-2.5 py-0.5 rounded-full shadow-lg border-2 border-[#EF3324]'
+            },
+            {
+                text: 'Cargo Lifts (×3)',
+                pos: new THREE.Vector3(toWorldX(47.3), 4.6, toWorldZ(34.0)),
+                cls: 'bg-stone-900/90 text-white font-semibold text-[10px] px-2 py-0.5 rounded shadow border border-[#EF3324]'
+            },
+            {
+                text: 'Cargo Lifts (×3)',
+                pos: new THREE.Vector3(toWorldX(47.3), 4.6, toWorldZ(45.6)),
+                cls: 'bg-stone-900/90 text-white font-semibold text-[10px] px-2 py-0.5 rounded shadow border border-[#EF3324]'
+            }
+        ];
+
+        extraBadges.forEach(b => {
+            const el = document.createElement('div');
+            el.className = `zone-label pointer-events-none ${b.cls}`;
+            el.innerText = b.text;
+            container.appendChild(el);
+            htmlLabels.push({
+                element: el,
+                worldPos: b.pos,
+                zoneId: null
+            });
+        });
+
+        // Floating Role Tags above each of the 5 Workers
+        animatedWorkers.forEach(w => {
+            const el = document.createElement('div');
+            el.className = 'zone-label pointer-events-none bg-stone-950/90 text-white font-semibold text-[10px] px-2 py-0.5 rounded-full shadow border border-[#EF3324] whitespace-nowrap';
+            el.innerText = w.label;
+            container.appendChild(el);
+            htmlLabels.push({
+                element: el,
+                workerRef: w,
+                worldPos: w.mesh.position.clone().add(new THREE.Vector3(0, 2.3, 0)),
+                zoneId: null
+            });
+        });
+    }
+
+    function updateFloatingLabels() {
+        if (!showLabels) return;
+        const widthHalf = window.innerWidth / 2;
+        const heightHalf = window.innerHeight / 2;
+
+        htmlLabels.forEach(item => {
+            if (item.workerRef) {
+                if (!animateForklifts) {
+                    item.element.style.display = 'none';
+                    return;
+                }
+                item.worldPos.copy(item.workerRef.mesh.position).add(new THREE.Vector3(0, 2.35, 0));
+            }
+
+            const pos = item.worldPos.clone();
+            pos.project(camera);
+
+            // Hide if behind camera
+            if (pos.z > 1) {
+                item.element.style.display = 'none';
+                return;
+            }
+
+            const x = (pos.x * widthHalf) + widthHalf;
+            const y = -(pos.y * heightHalf) + heightHalf;
+
+            item.element.style.display = 'block';
+            item.element.style.left = `${x}px`;
+            item.element.style.top = `${y}px`;
+        });
+    }
+
+    // ==========================================
+    // 8. INTERACTION, CAMERA & UI FUNCTIONS
+    // ==========================================
+    function setupInteractionEvents() {
+        const dom = renderer.domElement;
+
+        dom.addEventListener('pointerdown', (e) => {
+            camState.isDragging = true;
+            camState.isPanning = (e.button === 2 || e.shiftKey);
+            camState.prevMouse = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!camState.isDragging) return;
+            const dx = e.clientX - camState.prevMouse.x;
+            const dy = e.clientY - camState.prevMouse.y;
+            camState.prevMouse = { x: e.clientX, y: e.clientY };
+
+            if (camState.isPanning) {
+                const panSpeed = camState.radius * 0.0015;
+                const right = new THREE.Vector3();
+                const forward = new THREE.Vector3();
+                camera.getWorldDirection(forward);
+                right.crossVectors(forward, camera.up).normalize();
+                forward.y = 0;
+                forward.normalize();
+
+                camState.targetGoal.addScaledVector(right, -dx * panSpeed);
+                camState.targetGoal.addScaledVector(forward, dy * panSpeed);
+            } else {
+                camState.thetaGoal -= dx * 0.006;
+                camState.phiGoal = Math.max(0.08, Math.min(Math.PI / 2 - 0.08, camState.phiGoal - dy * 0.006));
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            camState.isDragging = false;
+        });
+
+        dom.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        dom.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            camState.radiusGoal = Math.max(18, Math.min(135, camState.radiusGoal + e.deltaY * 0.05));
+        }, { passive: false });
+
+        // Click to Select Zone
+        dom.addEventListener('click', (e) => {
+            const rect = dom.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const meshes = Object.values(zoneFloorMeshes);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const zoneId = intersects[0].object.userData.zoneId;
+                if (zoneId) selectZone(zoneId);
+            }
+        });
+    }
+
+    function selectZone(zoneId) {
+        selectedZoneId = zoneId;
+        const data = ZONES_DATA[zoneId];
+        if (!data) return;
+
+        // Highlight Floor Mesh
+        Object.entries(zoneFloorMeshes).forEach(([id, mesh]) => {
+            if (id === zoneId) {
+                mesh.material.emissive = new THREE.Color(ARAMEX_RED);
+                mesh.material.emissiveIntensity = 0.35;
+            } else {
+                mesh.material.emissive = new THREE.Color(0x000000);
+                mesh.material.emissiveIntensity = 0;
+            }
+        });
+
+        // Highlight Sidebar Button
+        Object.keys(ZONES_DATA).forEach(id => {
+            const btn = document.getElementById(`zone-btn-${id}`);
+            if (btn) {
+                if (id === zoneId) {
+                    btn.classList.add('ring-2', 'ring-[#EF3324]', 'bg-stone-800');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-[#EF3324]', 'bg-stone-800');
+                }
+            }
+        });
+
+        // Update Inspector Card
+        document.getElementById('inspector-badge').innerText = zoneId;
+        document.getElementById('inspector-title').innerText = data.title;
+        document.getElementById('inspector-desc').innerText = data.description;
+        document.getElementById('inspector-dim').innerText = data.dimensions;
+        document.getElementById('inspector-pallet').innerText = data.palletSpec;
+        document.getElementById('inspector-cap').innerText = data.pallets > 0 ? `${data.pallets} Pallets` : '6 Cargo Lifts';
+        document.getElementById('inspector-area').innerText = data.area;
+
+        // Smoothly glide camera target to selected zone
+        camState.targetGoal.set(data.centerX, 0, data.centerZ);
+        camState.radiusGoal = 42;
+        camState.phiGoal = 0.85;
+    }
+
+    function resetSelection() {
+        selectedZoneId = null;
+        Object.values(zoneFloorMeshes).forEach(mesh => {
+            mesh.material.emissive = new THREE.Color(0x000000);
+            mesh.material.emissiveIntensity = 0;
+        });
+        Object.keys(ZONES_DATA).forEach(id => {
+            const btn = document.getElementById(`zone-btn-${id}`);
+            if (btn) btn.classList.remove('ring-2', 'ring-[#EF3324]', 'bg-stone-800');
+        });
+
+        document.getElementById('inspector-badge').innerText = 'Overview';
+        document.getElementById('inspector-title').innerText = 'All Warehouse Zones';
+        document.getElementById('inspector-desc').innerText = 'Click any zone or structural block in the 3D viewport to inspect specs and dimensions.';
+        document.getElementById('inspector-dim').innerText = '48.76m × 52.5m';
+        document.getElementById('inspector-pallet').innerText = '120×100×180cm';
+        document.getElementById('inspector-cap').innerText = '1,320 Pallets';
+        document.getElementById('inspector-area').innerText = '2,560 m² (32,916 sqft)';
+
+        setCameraPreset('iso');
+    }
+
+    function setCameraPreset(preset) {
+        ['iso', 'top', 'working'].forEach(p => {
+            const btn = document.getElementById(`btn-cam-${p}`);
+            if (btn) {
+                btn.className = (p === preset)
+                    ? 'px-3 py-1.5 rounded-lg text-xs font-medium bg-[#EF3324] text-white shadow transition'
+                    : 'px-3 py-1.5 rounded-lg text-xs font-medium bg-stone-900 text-stone-300 hover:bg-stone-800 border border-stone-700 transition';
+            }
+        });
+
+        if (preset === 'iso') {
+            camState.targetGoal.set(0, 0, 0);
+            camState.thetaGoal = -0.45;
+            camState.phiGoal = 0.92;
+            camState.radiusGoal = 68;
+        } else if (preset === 'top') {
+            camState.targetGoal.set(0, 0, 0);
+            camState.thetaGoal = 0;
+            camState.phiGoal = 0.05; // Top-down matching PDF blueprint orientation
+            camState.radiusGoal = 72;
+        } else if (preset === 'working') {
+            camState.targetGoal.set(toWorldX(42.5), 0, 0);
+            camState.thetaGoal = 0.55;
+            camState.phiGoal = 0.85;
+            camState.radiusGoal = 46;
+        }
+    }
+
+    function updatePalletUtilization(percent) {
+        const ratio = parseInt(percent, 10) / 100;
+        const totalMax = 1320;
+        const activeCount = Math.round(totalMax * ratio);
+
+        document.getElementById('utilization-label').innerText = `${percent}% (${activeCount.toLocaleString()} / 1,320)`;
+        document.getElementById('header-total-pallets').innerText = `${activeCount.toLocaleString()} Pallets (1 Layer)`;
+
+        palletMeshes.forEach((mesh, idx) => {
+            mesh.visible = (idx < activeCount);
+        });
+    }
+
+    function toggleLayer(layer, visible) {
+        if (layer === 'racks') {
+            racksGroup.visible = visible;
+        } else if (layer === 'pillars') {
+            pillarsGroup.visible = visible;
+        } else if (layer === 'labels') {
+            showLabels = visible;
+            document.getElementById('labels-container').style.display = visible ? 'block' : 'none';
+        } else if (layer === 'forklifts') {
+            animateForklifts = visible;
+            forkliftsGroup.visible = visible;
+            workersGroup.visible = visible;
+        }
+    }
+
+    function toggleSidebar() {
+        const sb = document.getElementById('sidebar');
+        const btnText = document.getElementById('sidebar-btn-text');
+        const isClosed = sb.classList.toggle('-translate-x-[120%]');
+        if (btnText) {
+            btnText.innerText = isClosed ? 'Open Controls' : 'Hide Controls';
+        }
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // ==========================================
+    // 9. ANIMATION LOOP
+    // ==========================================
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = performance.now() * 0.005;
+
+        // Smooth Damping for Camera Orbit & Target
+        camState.theta += (camState.thetaGoal - camState.theta) * 0.1;
+        camState.phi += (camState.phiGoal - camState.phi) * 0.1;
+        camState.radius += (camState.radiusGoal - camState.radius) * 0.1;
+        camState.target.lerp(camState.targetGoal, 0.1);
+
+        camera.position.x = camState.target.x + camState.radius * Math.sin(camState.phi) * Math.sin(camState.theta);
+        camera.position.y = camState.target.y + camState.radius * Math.cos(camState.phi);
+        camera.position.z = camState.target.z + camState.radius * Math.sin(camState.phi) * Math.cos(camState.theta);
+        camera.lookAt(camState.target);
+
+        // Animate Forklifts & 5 Warehouse Workers
+        if (animateForklifts) {
+            forklifts.forEach(fl => {
+                fl.mesh.position.z += fl.speed;
+                if (fl.mesh.position.z > fl.maxZ || fl.mesh.position.z < fl.minZ) {
+                    fl.speed *= -1;
+                    fl.mesh.rotation.y = fl.speed > 0 ? 0 : Math.PI;
+                }
+            });
+
+            animatedWorkers.forEach(w => {
+                const parts = w.mesh.userData;
+                if (w.role === 'packing') {
+                    // Stationary packing motion: torso sway + arm packing action
+                    w.mesh.rotation.y = Math.PI / 2 + Math.sin(time * 1.5 + w.phaseOffset) * 0.35;
+                    parts.leftArm.rotation.x = -Math.PI / 3 + Math.sin(time * 3 + w.phaseOffset) * 0.25;
+                    parts.rightArm.rotation.x = -Math.PI / 3 - Math.sin(time * 3 + w.phaseOffset) * 0.25;
+                    if (parts.propMesh) {
+                        parts.propMesh.position.y = 1.08 + Math.abs(Math.sin(time * 2 + w.phaseOffset)) * 0.12;
+                    }
+                } else {
+                    // Walking / Picking / Moving along path
+                    w.progress += 0.0035 * w.direction;
+                    if (w.progress >= 1) {
+                        w.progress = 1;
+                        w.direction = -1;
+                    } else if (w.progress <= 0) {
+                        w.progress = 0;
+                        w.direction = 1;
+                    }
+                    w.mesh.position.lerpVectors(w.startPos, w.endPos, w.progress);
+
+                    // Face direction of travel
+                    const dirVec = new THREE.Vector3().subVectors(
+                        w.direction > 0 ? w.endPos : w.startPos,
+                        w.direction > 0 ? w.startPos : w.endPos
+                    ).normalize();
+                    w.mesh.rotation.y = Math.atan2(dirVec.x, dirVec.z);
+
+                    // Leg walking cycle
+                    const walkCycle = Math.sin(time * 3.5 + w.phaseOffset) * 0.45;
+                    parts.leftLeg.rotation.x = walkCycle;
+                    parts.rightLeg.rotation.x = -walkCycle;
+                }
+            });
+        }
+
+        // Sync 3D Callout Badges
+        updateFloatingLabels();
+
+        renderer.render(scene, camera);
+    }
+
+    window.onload = init3D;
+</script>
+</body>
+</html>
